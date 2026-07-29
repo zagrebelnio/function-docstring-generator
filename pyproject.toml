@@ -5,11 +5,14 @@ description = "Generates Google/NumPy style docstrings for Python functions and 
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.140.13",
     "pydantic>=2.13.4",
+    "uvicorn[standard]>=0.51.0",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.9.1",
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "ruff>=0.16.0",

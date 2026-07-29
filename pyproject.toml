@@ -4,11 +4,14 @@ version = "0.1.0"
 description = "Generates Google/NumPy style docstrings for Python functions and classes"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.4",
+]
 
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.1",
+    "pytest>=9.1.1",
     "ruff>=0.16.0",
 ]
 

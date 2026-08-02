@@ -5,7 +5,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from app.models.docstring import DocstringContent
-from app.models.parsed import ParameterKind, ParsedFunction, ParsedParameter
+from app.models.parsed import (
+    ParameterKind,
+    ParsedClass,
+    ParsedFunction,
+    ParsedParameter,
+    ParsedSymbol,
+)
 
 INDENT = "    "
 
@@ -18,15 +24,37 @@ _PREFIXES = {
 class DocstringRenderer(ABC):
     """Turns style-independent content into formatted docstring text."""
 
-    @abstractmethod
     def render(
+        self,
+        symbol: ParsedSymbol,
+        content: DocstringContent,
+        *,
+        include_example: bool = False,
+    ) -> str:
+        """Return the docstring body, without the surrounding triple quotes."""
+        if isinstance(symbol, ParsedClass):
+            return self.render_class(symbol, content, include_example=include_example)
+        return self.render_function(symbol, content, include_example=include_example)
+
+    @abstractmethod
+    def render_function(
         self,
         function: ParsedFunction,
         content: DocstringContent,
         *,
         include_example: bool = False,
     ) -> str:
-        """Return the docstring body, without the surrounding triple quotes."""
+        """Return the docstring body for a function or method."""
+
+    @abstractmethod
+    def render_class(
+        self,
+        cls: ParsedClass,
+        content: DocstringContent,
+        *,
+        include_example: bool = False,
+    ) -> str:
+        """Return the docstring body for a class."""
 
     @staticmethod
     def display_name(parameter: ParsedParameter) -> str:

@@ -18,6 +18,7 @@ class DocstringContent(BaseModel):
     summary: str
     description: str | None = None
     params: dict[str, str] = Field(default_factory=dict)
+    attributes: dict[str, str] = Field(default_factory=dict)
     returns: str | None = None
     raises: dict[str, str] = Field(default_factory=dict)
     example: str | None = None

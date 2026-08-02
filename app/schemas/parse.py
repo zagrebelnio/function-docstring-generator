@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from app.models.parsed import ParsedFunction
+from app.models.parsed import ParsedSymbol
 
 MAX_CODE_LENGTH = 20_000
 
@@ -14,9 +14,9 @@ class ParseRequest(BaseModel):
 
 
 class ParseResponse(BaseModel):
-    """Functions discovered in the submitted source code."""
+    """Symbols discovered in the submitted source code."""
 
-    functions: list[ParsedFunction]
+    symbols: list[ParsedSymbol]
 
 
 class ErrorResponse(BaseModel):

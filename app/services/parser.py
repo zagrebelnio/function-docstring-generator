@@ -5,7 +5,14 @@ from __future__ import annotations
 import ast
 from collections.abc import Iterator
 
-from app.models.parsed import ParameterKind, ParsedFunction, ParsedParameter
+from app.models.parsed import (
+    ParameterKind,
+    ParsedAttribute,
+    ParsedClass,
+    ParsedFunction,
+    ParsedParameter,
+    ParsedSymbol,
+)
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
@@ -23,8 +30,8 @@ class CodeParseError(ValueError):
         self.offset = offset
 
 
-def parse_source(source: str) -> list[ParsedFunction]:
-    """Extract every top-level function and method from the given source code."""
+def parse_source(source: str) -> list[ParsedSymbol]:
+    """Extract every class, function and method from the given source code."""
     if not source.strip():
         raise CodeParseError("Source code is empty")
 
@@ -38,11 +45,12 @@ def parse_source(source: str) -> list[ParsedFunction]:
     return list(_collect(tree, source, prefix=""))
 
 
-def _collect(node: ast.Module | ast.ClassDef, source: str, prefix: str) -> Iterator[ParsedFunction]:
+def _collect(node: ast.Module | ast.ClassDef, source: str, prefix: str) -> Iterator[ParsedSymbol]:
     for child in node.body:
         if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
             yield _build_function(child, source, prefix)
         elif isinstance(child, ast.ClassDef):
+            yield _build_class(child, source, prefix)
             yield from _collect(child, source, f"{prefix}{child.name}.")
 
 
@@ -134,3 +142,85 @@ def _collect_raises(node: FunctionNode) -> list[str]:
         if name not in names:
             names.append(name)
     return names
+
+
+def _build_class(node: ast.ClassDef, source: str, prefix: str) -> ParsedClass:
+    methods = [
+        child.name
+        for child in node.body
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and not child.name.startswith("_")
+    ]
+
+    return ParsedClass(
+        name=node.name,
+        qualified_name=f"{prefix}{node.name}",
+        bases=[ast.unparse(base) for base in node.bases],
+        decorators=[ast.unparse(decorator) for decorator in node.decorator_list],
+        attributes=_build_attributes(node),
+        method_names=methods,
+        existing_docstring=ast.get_docstring(node),
+        lineno=node.lineno,
+        source=ast.get_source_segment(source, node) or "",
+    )
+
+
+def _build_attributes(node: ast.ClassDef) -> list[ParsedAttribute]:
+    attributes: dict[str, ParsedAttribute] = {}
+
+    for child in node.body:
+        if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name):
+            _add_attribute(attributes, child.target.id, child.annotation, child.value)
+        elif isinstance(child, ast.Assign):
+            for target in child.targets:
+                if isinstance(target, ast.Name):
+                    _add_attribute(attributes, target.id, None, child.value)
+
+    init = next(
+        (
+            child
+            for child in node.body
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and child.name == "__init__"
+        ),
+        None,
+    )
+    if init is not None:
+        for child in _walk_own_scope(init):
+            if isinstance(child, ast.AnnAssign) and _is_self_attribute(child.target):
+                _add_attribute(attributes, child.target.attr, child.annotation, None)
+            elif isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if _is_self_attribute(target):
+                        _add_attribute(attributes, target.attr, None, None)
+
+    return list(attributes.values())
+
+
+def _add_attribute(
+    attributes: dict[str, ParsedAttribute],
+    name: str,
+    annotation: ast.expr | None,
+    default: ast.expr | None,
+) -> None:
+    if name.startswith("_"):
+        return
+
+    unparsed = ast.unparse(annotation) if annotation is not None else None
+    existing = attributes.get(name)
+    if existing is None:
+        attributes[name] = ParsedAttribute(
+            name=name,
+            annotation=unparsed,
+            default=ast.unparse(default) if default is not None else None,
+        )
+    elif existing.annotation is None and unparsed is not None:
+        existing.annotation = unparsed
+
+
+def _is_self_attribute(node: ast.expr) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "self"
+    )

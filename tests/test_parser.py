@@ -18,7 +18,7 @@ def test_simple_function():
 
 def test_method_drops_self():
     code = "class Service:\n    def run(self, times: int = 1) -> None:\n        pass"
-    (func,) = parse_source(code)
+    _, func = parse_source(code)
 
     assert func.qualified_name == "Service.run"
     assert func.is_method is True
@@ -30,7 +30,7 @@ def test_staticmethod_keeps_first_parameter():
                 @staticmethod\n
                 def add(self_like: int) -> int:\n
                         return self_like"""
-    (func,) = parse_source(code)
+    _, func = parse_source(code)
 
     assert [p.name for p in func.parameters] == ["self_like"]
 

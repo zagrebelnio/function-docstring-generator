@@ -13,6 +13,7 @@ class GenerateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=MAX_CODE_LENGTH)
     style: DocstringStyle = DocstringStyle.GOOGLE
     include_example: bool = False
+    skip_documented: bool = False
 
 
 class GenerateResponse(BaseModel):

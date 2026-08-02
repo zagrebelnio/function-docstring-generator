@@ -12,8 +12,7 @@ CODE = (
 
 
 def parse_one(code: str = CODE):
-    (function,) = parse_source(code)
-    return function
+    return parse_source(code)[-1]
 
 
 def test_system_prompt_mentions_json():

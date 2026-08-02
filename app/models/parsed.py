@@ -1,6 +1,7 @@
 """Structured facts extracted from Python source code."""
 
 from enum import StrEnum
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +28,7 @@ class ParsedParameter(BaseModel):
 class ParsedFunction(BaseModel):
     """Everything we can learn about a function without executing it."""
 
+    kind: Literal["function"] = "function"
     name: str
     qualified_name: str
     is_async: bool = False
@@ -40,3 +42,29 @@ class ParsedFunction(BaseModel):
     existing_docstring: str | None = None
     lineno: int
     source: str
+
+
+class ParsedAttribute(BaseModel):
+    """A public attribute declared by a class."""
+
+    name: str
+    annotation: str | None = None
+    default: str | None = None
+
+
+class ParsedClass(BaseModel):
+    """Everything we can learn about a class without executing it."""
+
+    kind: Literal["class"] = "class"
+    name: str
+    qualified_name: str
+    bases: list[str] = Field(default_factory=list)
+    decorators: list[str] = Field(default_factory=list)
+    attributes: list[ParsedAttribute] = Field(default_factory=list)
+    method_names: list[str] = Field(default_factory=list)
+    existing_docstring: str | None = None
+    lineno: int
+    source: str
+
+
+ParsedSymbol = Annotated[ParsedFunction | ParsedClass, Field(discriminator="kind")]

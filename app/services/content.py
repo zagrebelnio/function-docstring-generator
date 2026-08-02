@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from app.models.docstring import DocstringContent
-from app.models.parsed import ParsedFunction, ParsedParameter
+from app.models.parsed import (
+    ParsedAttribute,
+    ParsedClass,
+    ParsedFunction,
+    ParsedParameter,
+    ParsedSymbol,
+)
 
 _PLACEHOLDER = "Description is not available."
 
@@ -13,42 +19,50 @@ def humanize(name: str) -> str:
     return name.strip("_").replace("_", " ").strip()
 
 
-def build_skeleton(function: ParsedFunction) -> DocstringContent:
+def build_skeleton(symbol: ParsedSymbol) -> DocstringContent:
     """Build docstring content from the signature alone, without an LLM."""
+    if isinstance(symbol, ParsedClass):
+        return DocstringContent(
+            summary=f"{humanize(symbol.name).capitalize()}.",
+            attributes={a.name: _attribute_text(a) for a in symbol.attributes},
+        )
+
     return DocstringContent(
-        summary=_summary(function),
-        params={p.name: _parameter_text(p) for p in function.parameters},
-        returns=_returns_text(function),
-        raises={exception: _PLACEHOLDER for exception in function.raises},
+        summary=_summary(symbol),
+        params={p.name: _parameter_text(p) for p in symbol.parameters},
+        returns=_returns_text(symbol),
+        raises={exception: _PLACEHOLDER for exception in symbol.raises},
     )
 
 
-def reconcile(function: ParsedFunction, content: DocstringContent) -> DocstringContent:
-    """Align generated content with the real signature.
+def reconcile(symbol: ParsedSymbol, content: DocstringContent) -> DocstringContent:
+    """Align generated content with the real signature."""
+    skeleton = build_skeleton(symbol)
+    is_class = isinstance(symbol, ParsedClass)
 
-    Descriptions for parameters or exceptions that do not exist are dropped, and
-    anything the generator missed is filled in from the static skeleton.
-    """
-    skeleton = build_skeleton(function)
-
-    params = {
-        name: (content.params.get(name) or "").strip() or fallback
-        for name, fallback in skeleton.params.items()
-    }
-    raises = {
-        exception: (content.raises.get(exception) or "").strip() or fallback
-        for exception, fallback in skeleton.raises.items()
-    }
-
-    returns = (content.returns or "").strip() or skeleton.returns
     return DocstringContent(
         summary=content.summary.strip() or skeleton.summary,
         description=(content.description or "").strip() or None,
-        params=params,
-        returns=returns if skeleton.returns is not None else None,
-        raises=raises,
+        params=_merge(content.params, skeleton.params),
+        attributes=_merge(content.attributes, skeleton.attributes),
+        returns=None if is_class else (content.returns or "").strip() or skeleton.returns,
+        raises=_merge(content.raises, skeleton.raises),
         example=(content.example or "").strip() or None,
     )
+
+
+def _merge(generated: dict[str, str], skeleton: dict[str, str]) -> dict[str, str]:
+    """Keep only the names present in the skeleton, filling the gaps from it."""
+    return {
+        name: (generated.get(name) or "").strip() or fallback for name, fallback in skeleton.items()
+    }
+
+
+def _attribute_text(attribute: ParsedAttribute) -> str:
+    subject = humanize(attribute.name)
+    if attribute.annotation:
+        return f"The {subject} of type {attribute.annotation}."
+    return f"The {subject}."
 
 
 def _summary(function: ParsedFunction) -> str:
@@ -63,10 +77,12 @@ def _parameter_text(parameter: ParsedParameter) -> str:
 
 
 def _returns_text(function: ParsedFunction) -> str | None:
+    if function.return_annotation in {"None", "NoReturn"}:
+        return None
     if not (function.returns_value or function.is_generator or function.return_annotation):
         return None
 
-    verb = "Yields" if function.is_generator else "Returns"
+    subject = "The yielded value." if function.is_generator else "The produced value."
     if function.return_annotation:
-        return f"{verb} a value of type {function.return_annotation}."
-    return f"{verb} a value."
+        return f"{subject[:-1]} of type {function.return_annotation}."
+    return subject

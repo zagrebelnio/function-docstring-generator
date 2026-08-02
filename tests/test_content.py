@@ -65,3 +65,34 @@ def test_reconcile_replaces_empty_summary():
 
     assert result.summary == "Fetch user."
     assert result.returns
+
+
+def test_class_skeleton_covers_attributes():
+    parsed = parse_source("class Repo:\n    table: str = 'items'\n")[0]
+
+    skeleton = build_skeleton(parsed)
+
+    assert skeleton.summary == "Repo."
+    assert set(skeleton.attributes) == {"table"}
+    assert skeleton.params == {}
+
+
+def test_reconcile_drops_invented_attributes():
+    parsed = parse_source("class Repo:\n    table: str = 'items'\n")[0]
+    content = DocstringContent(
+        summary="Repo.", attributes={"table": "The table.", "ghost": "Nope."}
+    )
+
+    result = reconcile(parsed, content)
+
+    assert set(result.attributes) == {"table"}
+
+
+def test_class_never_keeps_returns():
+    parsed = parse_source("class Repo:\n    table: str = 'items'\n")[0]
+    content = DocstringContent(summary="Repo.", returns="Invented.", params={"x": "Invented."})
+
+    result = reconcile(parsed, content)
+
+    assert result.returns is None
+    assert result.params == {}

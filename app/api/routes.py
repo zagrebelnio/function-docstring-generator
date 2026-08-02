@@ -24,22 +24,22 @@ def health() -> dict[str, str]:
     tags=["parsing"],
 )
 def parse(request: ParseRequest) -> ParseResponse:
-    """Extract functions and their signatures from the given Python source code."""
+    """Extract classes, functions and their signatures from the given Python source code."""
     try:
-        functions = parse_source(request.code)
+        symbols = parse_source(request.code)
     except CodeParseError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"detail": exc.message, "line": exc.line, "offset": exc.offset},
         ) from exc
 
-    if not functions:
+    if not symbols:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": "No functions or methods found in the given source code"},
+            detail={"detail": "No classes, functions or methods found in the given source code"},
         )
 
-    return ParseResponse(functions=functions)
+    return ParseResponse(symbols=symbols)
 
 
 @router.get("/styles", tags=["system"])
@@ -55,23 +55,34 @@ def styles() -> list[str]:
     tags=["generation"],
 )
 async def generate(request: GenerateRequest, generator: GeneratorDep) -> GenerateResponse:
-    """Generate a docstring for every function found in the given source code."""
+    """Generate a docstring for every class and function found in the given source code."""
     try:
-        functions = parse_source(request.code)
+        symbols = parse_source(request.code)
     except CodeParseError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"detail": exc.message, "line": exc.line, "offset": exc.offset},
         ) from exc
 
-    if not functions:
+    if not symbols:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": "No functions or methods found in the given source code"},
+            detail={"detail": "No classes, functions or methods found in the given source code"},
+        )
+
+    targets = (
+        [symbol for symbol in symbols if not symbol.existing_docstring]
+        if request.skip_documented
+        else symbols
+    )
+    if not targets:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"detail": "Every symbol in the given source code is already documented"},
         )
 
     results = [
-        await generator.generate(function, request.style, include_example=request.include_example)
-        for function in functions
+        await generator.generate(symbol, request.style, include_example=request.include_example)
+        for symbol in targets
     ]
     return GenerateResponse(results=results)

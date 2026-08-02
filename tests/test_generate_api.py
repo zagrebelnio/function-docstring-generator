@@ -84,3 +84,27 @@ def test_generates_for_class_and_its_methods(client):
     results = response.json()["results"]
     assert [r["kind"] for r in results] == ["class", "function"]
     assert [r["symbol_name"] for r in results] == ["Repo", "Repo.get"]
+
+
+def test_skip_documented_filters_symbols(client):
+    code = 'def a():\n    """Documented."""\n    pass\n\n\ndef b():\n    pass'
+
+    response = client.post("/generate", json={"code": code, "skip_documented": True})
+
+    assert [r["symbol_name"] for r in response.json()["results"]] == ["b"]
+
+
+def test_skip_documented_rejects_fully_documented_code(client):
+    code = 'def a():\n    """Documented."""\n    pass'
+
+    response = client.post("/generate", json={"code": code, "skip_documented": True})
+
+    assert response.status_code == 422
+
+
+def test_documented_symbols_are_kept_by_default(client):
+    code = 'def a():\n    """Documented."""\n    pass\n\n\ndef b():\n    pass'
+
+    response = client.post("/generate", json={"code": code})
+
+    assert [r["symbol_name"] for r in response.json()["results"]] == ["a", "b"]

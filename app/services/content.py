@@ -77,10 +77,12 @@ def _parameter_text(parameter: ParsedParameter) -> str:
 
 
 def _returns_text(function: ParsedFunction) -> str | None:
+    if function.return_annotation in {"None", "NoReturn"}:
+        return None
     if not (function.returns_value or function.is_generator or function.return_annotation):
         return None
 
-    verb = "Yields" if function.is_generator else "Returns"
+    subject = "The yielded value." if function.is_generator else "The produced value."
     if function.return_annotation:
-        return f"{verb} a value of type {function.return_annotation}."
-    return f"{verb} a value."
+        return f"{subject[:-1]} of type {function.return_annotation}."
+    return subject

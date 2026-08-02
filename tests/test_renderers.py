@@ -101,3 +101,20 @@ def test_var_args_keep_their_prefixes():
 
     assert "*args:" in result
     assert "**kwargs:" in result
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "The value, defaults to 5.",
+        "The value, defaulting to 5.",
+        "By default 5, the value to add.",
+    ],
+)
+def test_default_is_not_repeated(description):
+    (function,) = parse_source("def f(y=5):\n    return y")
+    content = DocstringContent(summary="Do.", params={"y": description})
+
+    result = get_renderer(DocstringStyle.GOOGLE).render(function, content)
+
+    assert result.count("5") == 1

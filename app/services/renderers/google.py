@@ -42,9 +42,7 @@ class GoogleRenderer(DocstringRenderer):
                 qualifiers.append("optional")
 
             head = f"{name} ({', '.join(qualifiers)})" if qualifiers else name
-            text = content.params.get(parameter.name, "").strip()
-            if self.is_optional(parameter):
-                text = f"{text} Defaults to {parameter.default}.".strip()
+            text = self.parameter_text(parameter, content)
 
             lines.append(f"{INDENT}{head}: {text}")
         return "\n".join(lines)

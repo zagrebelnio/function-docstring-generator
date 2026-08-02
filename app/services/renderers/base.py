@@ -36,6 +36,19 @@ class DocstringRenderer(ABC):
             return self.render_class(symbol, content, include_example=include_example)
         return self.render_function(symbol, content, include_example=include_example)
 
+    def parameter_text(self, parameter: ParsedParameter, content: DocstringContent) -> str:
+        """Return the description with the default value appended once."""
+        text = content.params.get(parameter.name, "").strip()
+        if not self.is_optional(parameter):
+            return text
+
+        lowered = text.lower()
+        value = str(parameter.default).strip("'\"").lower()
+        if "default" in lowered and value in lowered:
+            return text
+
+        return f"{text} Defaults to {parameter.default}.".strip()
+
     @abstractmethod
     def render_function(
         self,
@@ -74,6 +87,8 @@ class DocstringRenderer(ABC):
     @staticmethod
     def has_result(function: ParsedFunction) -> bool:
         """Tell whether the function produces a value worth documenting."""
+        if function.return_annotation in {"None", "NoReturn"}:
+            return False
         return function.returns_value or function.is_generator or bool(function.return_annotation)
 
 

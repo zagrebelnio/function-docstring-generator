@@ -16,11 +16,15 @@ SYSTEM_PROMPT = (
     '  "description": an optional extra paragraph, or null\n'
     '  "params": an object mapping every parameter name to one sentence\n'
     '  "attributes": an object mapping every attribute name to one sentence\n'
-    '  "returns": one sentence about the produced value, or null\n'
+    '  "returns": one sentence about the produced or yielded value, or null\n'
     '  "raises": an object mapping every exception name to the condition triggering it\n'
     '  "example": a short doctest-style snippet using >>> , or null\n'
     "Describe meaning, not types: the types are already visible in the code.\n"
     'For a class, use "attributes" and leave "params", "returns" and "raises" empty.'
+    "Never mention default values in your descriptions: the renderer adds them from the "
+    "signature. Describe only what the parameter or attribute means.\n"
+    "For a class, start the summary with a verb describing what it does, not with "
+    '"A class that" or "This class".\n'
 )
 
 RETRY_SUFFIX = "\n\nYour previous answer was not valid JSON. Return only the JSON object."

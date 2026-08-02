@@ -70,8 +70,19 @@ async def generate(request: GenerateRequest, generator: GeneratorDep) -> Generat
             detail={"detail": "No classes, functions or methods found in the given source code"},
         )
 
+    targets = (
+        [symbol for symbol in symbols if not symbol.existing_docstring]
+        if request.skip_documented
+        else symbols
+    )
+    if not targets:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"detail": "Every symbol in the given source code is already documented"},
+        )
+
     results = [
         await generator.generate(symbol, request.style, include_example=request.include_example)
-        for symbol in symbols
+        for symbol in targets
     ]
     return GenerateResponse(results=results)

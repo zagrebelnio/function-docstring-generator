@@ -47,9 +47,7 @@ class NumpyRenderer(DocstringRenderer):
             name = self.display_name(parameter)
             lines.append(f"{name} : {', '.join(qualifiers)}" if qualifiers else name)
 
-            text = content.params.get(parameter.name, "").strip()
-            if self.is_optional(parameter):
-                text = f"{text} Defaults to {parameter.default}.".strip()
+            text = self.parameter_text(parameter, content)
             lines.append(f"{INDENT}{text}")
         return "\n".join(lines)
 

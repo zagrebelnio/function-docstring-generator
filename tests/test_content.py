@@ -86,3 +86,13 @@ def test_reconcile_drops_invented_attributes():
     result = reconcile(parsed, content)
 
     assert set(result.attributes) == {"table"}
+
+
+def test_class_never_keeps_returns():
+    parsed = parse_source("class Repo:\n    table: str = 'items'\n")[0]
+    content = DocstringContent(summary="Repo.", returns="Invented.", params={"x": "Invented."})
+
+    result = reconcile(parsed, content)
+
+    assert result.returns is None
+    assert result.params == {}

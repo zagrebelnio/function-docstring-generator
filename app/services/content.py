@@ -36,19 +36,16 @@ def build_skeleton(symbol: ParsedSymbol) -> DocstringContent:
 
 
 def reconcile(symbol: ParsedSymbol, content: DocstringContent) -> DocstringContent:
-    """Align generated content with the real signature.
-
-    Descriptions for names that do not exist are dropped, and anything the generator
-    missed is filled in from the static skeleton.
-    """
+    """Align generated content with the real signature."""
     skeleton = build_skeleton(symbol)
+    is_class = isinstance(symbol, ParsedClass)
 
     return DocstringContent(
         summary=content.summary.strip() or skeleton.summary,
         description=(content.description or "").strip() or None,
         params=_merge(content.params, skeleton.params),
         attributes=_merge(content.attributes, skeleton.attributes),
-        returns=(content.returns or "").strip() or skeleton.returns,
+        returns=None if is_class else (content.returns or "").strip() or skeleton.returns,
         raises=_merge(content.raises, skeleton.raises),
         example=(content.example or "").strip() or None,
     )

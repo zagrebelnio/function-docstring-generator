@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.llm import LLMError, LLMProvider
 from app.models.docstring import DocstringContent, DocstringStyle
-from app.models.parsed import ParsedFunction
+from app.models.parsed import ParsedFunction, ParsedSymbol
 from app.services.content import build_skeleton, reconcile
 from app.services.prompt import RETRY_SUFFIX, SYSTEM_PROMPT, build_user_prompt
 from app.services.renderers import get_renderer
@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 class GeneratedDocstring(BaseModel):
     """A rendered docstring together with the content it was built from."""
 
-    function_name: str
+    symbol_name: str
+    kind: str
     style: DocstringStyle
     docstring: str
     content: DocstringContent
@@ -35,35 +36,34 @@ class DocstringGenerator:
 
     async def generate(
         self,
-        function: ParsedFunction,
+        symbol: ParsedSymbol,
         style: DocstringStyle,
         *,
         include_example: bool = False,
     ) -> GeneratedDocstring:
-        """Generate a docstring for one function in the requested style."""
-        content, degraded = await self._build_content(function, include_example=include_example)
+        """Generate a docstring for one symbol in the requested style."""
+        content, degraded = await self._build_content(symbol, include_example=include_example)
 
         return GeneratedDocstring(
-            function_name=function.qualified_name,
+            symbol_name=symbol.qualified_name,
+            kind=symbol.kind,
             style=style,
-            docstring=get_renderer(style).render(
-                function, content, include_example=include_example
-            ),
+            docstring=get_renderer(style).render(symbol, content, include_example=include_example),
             content=content,
             degraded=degraded,
         )
 
     async def _build_content(
-        self, function: ParsedFunction, *, include_example: bool
+        self, symbol: ParsedFunction, *, include_example: bool
     ) -> tuple[DocstringContent, bool]:
-        user_prompt = build_user_prompt(function, include_example=include_example)
+        user_prompt = build_user_prompt(symbol, include_example=include_example)
         system_prompts = (SYSTEM_PROMPT, SYSTEM_PROMPT + RETRY_SUFFIX)
 
         for attempt, system_prompt in enumerate(system_prompts, start=1):
             try:
                 raw = await self._provider.complete(system_prompt, user_prompt)
             except LLMError as exc:
-                logger.warning("LLM unavailable for %s: %s", function.qualified_name, exc)
+                logger.warning("LLM unavailable for %s: %s", symbol.qualified_name, exc)
                 break
 
             try:
@@ -71,15 +71,15 @@ class DocstringGenerator:
             except (ValidationError, json.JSONDecodeError) as exc:
                 logger.warning(
                     "Malformed answer for %s (attempt %d): %s",
-                    function.qualified_name,
+                    symbol.qualified_name,
                     attempt,
                     exc,
                 )
                 continue
 
-            return reconcile(function, generated), False
+            return reconcile(symbol, generated), False
 
-        return build_skeleton(function), True
+        return build_skeleton(symbol), True
 
 
 def parse_model_answer(raw: str) -> DocstringContent:

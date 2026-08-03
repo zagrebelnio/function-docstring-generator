@@ -3,7 +3,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_generator
+from app.api.dependencies import get_generator, get_settings
+from app.core.config import Settings
 from app.llm import FakeProvider
 from app.main import app
 from app.services.generator import DocstringGenerator
@@ -108,3 +109,36 @@ def test_documented_symbols_are_kept_by_default(client):
     response = client.post("/generate", json={"code": code})
 
     assert [r["symbol_name"] for r in response.json()["results"]] == ["a", "b"]
+
+
+def test_rejects_too_many_symbols(client):
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, max_symbols_per_request=2
+    )
+    code = "def a():\n    pass\n\n\ndef b():\n    pass\n\n\ndef c():\n    pass"
+
+    response = client.post("/generate", json={"code": code})
+
+    assert response.status_code == 422
+    assert "3" in response.json()["detail"]["detail"]
+
+
+def test_accepts_up_to_the_configured_limit(client):
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, max_symbols_per_request=2
+    )
+    code = "def a():\n    pass\n\n\ndef b():\n    pass"
+
+    response = client.post("/generate", json={"code": code})
+
+    assert response.status_code == 200
+    assert len(response.json()["results"]) == 2
+
+
+def test_rejects_code_over_the_configured_length(client):
+    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, max_code_length=20)
+
+    response = client.post("/generate", json={"code": "def add(a, b):\n    return a + b"})
+
+    assert response.status_code == 422
+    assert "too long" in response.json()["detail"]["detail"].lower()

@@ -61,13 +61,15 @@ does not re-trigger a model call.
 
 All settings are read from environment variables or from a `.env` file.
 
-| Variable          | Default       | Description                                          |
-| ----------------- | ------------- | ---------------------------------------------------- |
-| `LLM_PROVIDER`    | `fake`        | `openai` for real generation, `fake` for offline use |
-| `OPENAI_API_KEY`  | empty         | Required when `LLM_PROVIDER=openai`                  |
-| `OPENAI_MODEL`    | `gpt-4o-mini` | Any chat completions model your account can access   |
-| `LLM_TIMEOUT`     | `30`          | Request timeout in seconds                           |
-| `LLM_TEMPERATURE` | `0.2`         | Lower values give more predictable wording           |
+| Variable                  | Default       | Description                                                         |
+| ------------------------- | ------------- | ------------------------------------------------------------------- |
+| `LLM_PROVIDER`            | `fake`        | `openai` for real generation, `fake` for offline use                |
+| `OPENAI_API_KEY`          | empty         | Required when `LLM_PROVIDER=openai`                                 |
+| `OPENAI_MODEL`            | `gpt-4o-mini` | Any chat completions model your account can access                  |
+| `LLM_TIMEOUT`             | `30`          | Request timeout in seconds                                          |
+| `LLM_TEMPERATURE`         | `0.2`         | Lower values give more predictable wording                          |
+| `MAX_CODE_LENGTH`         | `20000`       | Maximum length, in characters, of submitted source code             |
+| `MAX_SYMBOLS_PER_REQUEST` | `15`          | Maximum classes/functions/methods generated in one `/generate` call |
 
 To use a real model:
 
@@ -76,8 +78,6 @@ LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 ```
-
-Restart the server after editing `.env`.
 
 ## API
 
@@ -96,12 +96,12 @@ Request:
 }
 ```
 
-| Field             | Type                | Default  | Description                                |
-| ----------------- | ------------------- | -------- | ------------------------------------------ |
-| `code`            | string              | required | Python source, 1 to 20000 characters       |
-| `style`           | `google` \| `numpy` | `google` | Output format                              |
-| `include_example` | boolean             | `false`  | Add a doctest-style usage example          |
-| `skip_documented` | boolean             | `false`  | Skip symbols that already have a docstring |
+| Field             | Type                | Default  | Description                                       |
+| ----------------- | ------------------- | -------- | ------------------------------------------------- |
+| `code`            | string              | required | Python source, up to `MAX_CODE_LENGTH` characters |
+| `style`           | `google` \| `numpy` | `google` | Output format                                     |
+| `include_example` | boolean             | `false`  | Add a doctest-style usage example                 |
+| `skip_documented` | boolean             | `false`  | Skip symbols that already have a docstring        |
 
 Response:
 
@@ -161,9 +161,15 @@ Reports that the service is running.
 
 ### Errors
 
-Invalid Python, an empty body, or source without a single class, function, or method
-returns `422` with a message and, where the syntax error allows it, the line and column.
-If `skip_documented` filters out every symbol, the request also returns `422`.
+All errors return `422` with a JSON body containing a `detail` message.
+
+- Invalid Python, an empty body, or source without a single class, function, or method.
+  A syntax error also includes the line and column where parsing failed.
+- Source code longer than `MAX_CODE_LENGTH` characters.
+- More than `MAX_SYMBOLS_PER_REQUEST` classes, functions, or methods to document in one
+  `/generate` call (counted after `skip_documented` filtering, if used).
+- Every symbol filtered out because `skip_documented` was set and nothing was left to
+  document.
 
 ## Development
 
@@ -177,7 +183,7 @@ uv run pre-commit install      # run both on every commit
 Tests never call a real model. `FakeProvider` returns canned answers, and the API tests
 swap the generator through FastAPI dependency overrides. The suite covers signature and
 class parsing, both renderers for functions and classes, reconciliation against the
-signature, retry behaviour, and the fallback path.
+signature, retry behaviour, the fallback path, and the configurable limits.
 
 GitHub Actions runs the linter, the formatter check, and the tests on every push to
 `main` and `develop` and on every pull request.

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Function Docstring Generator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="masthead">
+        <h1>Function Docstring Generator</h1>
+        <p class="tagline">
+          The signature is read with Python's <code>ast</code> module and
+          treated as fact. The model only writes the prose. Open
+          <em>Signature facts</em> to see everything the analyser found before a
+          single word was generated.
+        </p>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Python source</span>
+          <button type="button" class="quiet" id="load-sample">
+            Load an example
+          </button>
+        </div>
+        <div class="panel-body">
+          <label for="code" class="visually-hidden" hidden>Python source</label>
+          <textarea
+            id="code"
+            spellcheck="false"
+            placeholder="Paste a function or a class."
+          ></textarea>
+
+          <div class="controls">
+            <span class="field">
+              <label for="style">Style</label>
+              <select id="style">
+                <option value="google">Google</option>
+                <option value="numpy">NumPy</option>
+              </select>
+            </span>
+            <label class="check"
+              ><input type="checkbox" id="example" /> Usage example</label
+            >
+            <label class="check"
+              ><input type="checkbox" id="skip" /> Skip documented</label
+            >
+            <button type="button" id="run">Write docstrings</button>
+          </div>
+
+          <p class="note" id="status"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Result</span>
+          <div class="tabs" role="tablist">
+            <button
+              type="button"
+              class="tab"
+              id="tab-docstrings"
+              role="tab"
+              aria-selected="true"
+            >
+              Docstrings
+            </button>
+            <button
+              type="button"
+              class="tab"
+              id="tab-facts"
+              role="tab"
+              aria-selected="false"
+            >
+              Signature facts
+            </button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="output">
+            <p class="empty">
+              Paste some code and press <strong>Write docstrings</strong>.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>

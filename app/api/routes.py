@@ -7,7 +7,7 @@ from app.core.config import Settings
 from app.models.docstring import DocstringStyle
 from app.schemas.generate import GenerateRequest, GenerateResponse
 from app.schemas.parse import ErrorResponse, ParseRequest, ParseResponse
-from app.services.parser import CodeParseError, parse_source
+from app.services.parser import parse_source
 
 router = APIRouter()
 
@@ -22,6 +22,13 @@ def _check_code_length(code: str, settings: Settings) -> None:
                     f"(got {len(code)} characters, limit {settings.max_code_length})"
                 )
             },
+        )
+
+
+def _require_symbols(symbols: list, message: str) -> None:
+    if not symbols:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"detail": message}
         )
 
 
@@ -40,21 +47,8 @@ def health() -> dict[str, str]:
 def parse(request: ParseRequest, settings: SettingsDep) -> ParseResponse:
     """Extract classes, functions and their signatures from the given Python source code."""
     _check_code_length(request.code, settings)
-
-    try:
-        symbols = parse_source(request.code)
-    except CodeParseError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": exc.message, "line": exc.line, "offset": exc.offset},
-        ) from exc
-
-    if not symbols:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": "No classes, functions or methods found in the given source code"},
-        )
-
+    symbols = parse_source(request.code)
+    _require_symbols(symbols, "No classes, functions or methods found in the given source code")
     return ParseResponse(symbols=symbols)
 
 
@@ -75,31 +69,15 @@ async def generate(
 ) -> GenerateResponse:
     """Generate a docstring for every class and function found in the given source code."""
     _check_code_length(request.code, settings)
-
-    try:
-        symbols = parse_source(request.code)
-    except CodeParseError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": exc.message, "line": exc.line, "offset": exc.offset},
-        ) from exc
-
-    if not symbols:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": "No classes, functions or methods found in the given source code"},
-        )
+    symbols = parse_source(request.code)
+    _require_symbols(symbols, "No classes, functions or methods found in the given source code")
 
     targets = (
         [symbol for symbol in symbols if not symbol.existing_docstring]
         if request.skip_documented
         else symbols
     )
-    if not targets:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"detail": "Every symbol in the given source code is already documented"},
-        )
+    _require_symbols(targets, "Every symbol in the given source code is already documented")
 
     if len(targets) > settings.max_symbols_per_request:
         raise HTTPException(

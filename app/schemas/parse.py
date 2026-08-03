@@ -4,13 +4,13 @@ from pydantic import BaseModel, Field
 
 from app.models.parsed import ParsedSymbol
 
-MAX_CODE_LENGTH = 20_000
+HARD_CODE_LENGTH_CEILING = 200_000
 
 
 class ParseRequest(BaseModel):
     """Incoming Python source code to analyse."""
 
-    code: str = Field(min_length=1, max_length=MAX_CODE_LENGTH)
+    code: str = Field(min_length=1, max_length=HARD_CODE_LENGTH_CEILING)
 
 
 class ParseResponse(BaseModel):

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     llm_timeout: float = 30.0
     llm_temperature: float = 0.2
 
+    max_code_length: int = 20_000
+    max_symbols_per_request: int = 15
+
 
 @lru_cache
 def get_settings() -> Settings:

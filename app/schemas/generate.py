@@ -3,14 +3,14 @@
 from pydantic import BaseModel, Field
 
 from app.models.docstring import DocstringStyle
-from app.schemas.parse import MAX_CODE_LENGTH
+from app.schemas.parse import HARD_CODE_LENGTH_CEILING
 from app.services.generator import GeneratedDocstring
 
 
 class GenerateRequest(BaseModel):
     """Source code to document, plus the desired output format."""
 
-    code: str = Field(min_length=1, max_length=MAX_CODE_LENGTH)
+    code: str = Field(min_length=1, max_length=HARD_CODE_LENGTH_CEILING)
     style: DocstringStyle = DocstringStyle.GOOGLE
     include_example: bool = False
     skip_documented: bool = False

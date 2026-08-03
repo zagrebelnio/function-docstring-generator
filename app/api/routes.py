@@ -2,13 +2,27 @@
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.dependencies import GeneratorDep
+from app.api.dependencies import GeneratorDep, SettingsDep
+from app.core.config import Settings
 from app.models.docstring import DocstringStyle
 from app.schemas.generate import GenerateRequest, GenerateResponse
 from app.schemas.parse import ErrorResponse, ParseRequest, ParseResponse
 from app.services.parser import CodeParseError, parse_source
 
 router = APIRouter()
+
+
+def _check_code_length(code: str, settings: Settings) -> None:
+    if len(code) > settings.max_code_length:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "detail": (
+                    f"Source code is too long "
+                    f"(got {len(code)} characters, limit {settings.max_code_length})"
+                )
+            },
+        )
 
 
 @router.get("/health", tags=["system"])
@@ -23,8 +37,10 @@ def health() -> dict[str, str]:
     responses={status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}},
     tags=["parsing"],
 )
-def parse(request: ParseRequest) -> ParseResponse:
+def parse(request: ParseRequest, settings: SettingsDep) -> ParseResponse:
     """Extract classes, functions and their signatures from the given Python source code."""
+    _check_code_length(request.code, settings)
+
     try:
         symbols = parse_source(request.code)
     except CodeParseError as exc:
@@ -54,8 +70,12 @@ def styles() -> list[str]:
     responses={status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}},
     tags=["generation"],
 )
-async def generate(request: GenerateRequest, generator: GeneratorDep) -> GenerateResponse:
+async def generate(
+    request: GenerateRequest, generator: GeneratorDep, settings: SettingsDep
+) -> GenerateResponse:
     """Generate a docstring for every class and function found in the given source code."""
+    _check_code_length(request.code, settings)
+
     try:
         symbols = parse_source(request.code)
     except CodeParseError as exc:
@@ -79,6 +99,17 @@ async def generate(request: GenerateRequest, generator: GeneratorDep) -> Generat
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"detail": "Every symbol in the given source code is already documented"},
+        )
+
+    if len(targets) > settings.max_symbols_per_request:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "detail": (
+                    f"Too many symbols to document in one request "
+                    f"(found {len(targets)}, limit {settings.max_symbols_per_request})"
+                )
+            },
         )
 
     results = [
